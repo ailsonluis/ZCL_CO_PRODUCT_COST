@@ -12,6 +12,8 @@ public section.
              werks   type werks_d,
              matnr   type matnr,
              maktx   type maktx,
+             categ   type CKML_CATEG,
+             categtxt type DOMVALUE,
              quant   type kkb_ml_menge,
              meins   type meins,
              stval   type kkb_ml_bewer,
@@ -55,6 +57,15 @@ public section.
       !I_GJAHR type GJAHR
     exporting
       !E_CUST type TY_ITAB .
+
+  methods GET_COST_MATERIAL_T
+    importing
+      !I_MATNR type MATNR
+      !I_WERKS type WERKS_D
+      !I_POPER type POPER
+      !I_GJAHR type GJAHR     .
+
+
   protected section.
 private section.
 
@@ -64,11 +75,16 @@ private section.
       !I_WERKS type WERKS_D
       !I_POPER type POPER
       !I_GJAHR type GJAHR .
+
   methods GET_TXTMATERIAL
     importing
       !I_MATNR type MATNR
     returning
       value(RE_MAKTX) type MAKTX .
+
+
+
+
 ENDCLASS.
 
 
@@ -101,7 +117,8 @@ CLASS ZCL_CO_PRODUCT_COST IMPLEMENTATION.
     data: ref_tab_line1     like line of ref_tab.
 
     constants: g_runref    type mldoc-runref value 'ACT',
-               g_ccs_elehk type char2 value 'Z1'.
+               g_ccs_elehk type char2 value 'Z1',
+               c_rldnr type char2 value '0L'.
 
     data gr_select type ref to cl_ml_data_select.
     data : mlkey type mlkey.
@@ -110,6 +127,7 @@ CLASS ZCL_CO_PRODUCT_COST IMPLEMENTATION.
     data : t_tckh3  type standard table of tckh3
                                    with non-unique key elehk elemt .
     data lt_jahper type range of mldoc-jahrper.
+
     lt_jahper = value #( ( sign = 'I' option = 'EQ' low = |{ i_gjahr }{ i_poper }|  high = |{ i_gjahr }{ i_poper }| ) ).
 
     select * from tckh3 into table t_tckh3  where elehk = g_ccs_elehk.
@@ -131,7 +149,9 @@ CLASS ZCL_CO_PRODUCT_COST IMPLEMENTATION.
     create object gr_select
       exporting
         iv_kalnr   = mlkey-kalnr
+        iv_rldnr = c_rldnr
         iv_runref  = g_runref
+        iv_no_st = ''
         it_jahrper = lt_jahper
         it_tckh3   = t_tckh3
         iv_elesmhk = g_ccs_elehk.
@@ -162,7 +182,9 @@ CLASS ZCL_CO_PRODUCT_COST IMPLEMENTATION.
         internal_error     = 2
         others             = 3.
 
+   if sy-subrc eq 0.
 
+   endif.
   endmethod.
 
 
@@ -180,45 +202,181 @@ CLASS ZCL_CO_PRODUCT_COST IMPLEMENTATION.
 
     me->get_cost_detail( i_matnr = i_matnr i_werks = i_werks  i_poper =  i_poper i_gjahr = i_gjahr ).
 
-    if lt_all_sum is not initial.
-      data(lt_cust_stock_final) = value #( lt_all_sum[ categ = 'EB' ] ).
-      "if line_exists( lt_cust_stock_final[ categ = 'EB' ] ).
-      ls_cust = corresponding #( lt_cust_stock_final ).
-      ls_cust-werks = i_werks.
-      ls_cust-matnr = i_matnr.
-      ls_cust-maktx = me->get_txtmaterial( exporting i_matnr =  i_matnr ).
-      ls_cust-poper = i_poper.
-      ls_cust-gjhar = i_gjahr.
-      ls_cust-total =  ( ls_cust-stval + ls_cust-prd + ls_cust-kdm ) .
+
+
+
+    try.
+        data(lt_cust_stock_final) = value #( lt_all_sum[ categ = 'EB' ] ).
+        ls_cust = corresponding #( lt_cust_stock_final ).
+      catch cx_sy_itab_line_not_found.
+
+    endtry.
+
+    if ls_cust-quant = 0 . "Estoque final zero.
+      clear lt_cust_stock_final.
+      try.
+          lt_cust_stock_final = value #( lt_all_sum[ categ = 'KB' ] ).
+          ls_cust = corresponding #( lt_cust_stock_final ).
+
+          ls_cust-total =  ( ls_cust-stval + ls_cust-prd + ls_cust-kdm ) .
+          try .
+              ls_cust-price = ls_cust-total  / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+
+          try .
+              ls_cust-elm001 = ls_cust-elm001 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm002 = ls_cust-elm002 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm003 = ls_cust-elm003 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm004 = ls_cust-elm004 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm005 = ls_cust-elm005 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm006 = ls_cust-elm006 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm007 = ls_cust-elm007 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm008 = ls_cust-elm008 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm009 = ls_cust-elm009 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm010 = ls_cust-elm010 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm011 = ls_cust-elm011 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm012 = ls_cust-elm012 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm013 = ls_cust-elm013 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm014 = ls_cust-elm014 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm015 = ls_cust-elm015 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry.
+          try .
+              ls_cust-elm016 = ls_cust-elm016 / ls_cust-quant .
+            catch cx_sy_zerodivide.
+          endtry
+          .try .
+          ls_cust-elm017 = ls_cust-elm017 / ls_cust-quant .
+        catch cx_sy_zerodivide.
+      endtry.
       try .
-          ls_cust-price = ls_cust-total  / ls_cust-quant .
+          ls_cust-elm018 = ls_cust-elm018 / ls_cust-quant .
         catch cx_sy_zerodivide.
       endtry.
 
-      ls_cust-elm001 = ls_cust-elm001 .
-      ls_cust-elm002 = ls_cust-elm002 .
-      ls_cust-elm003 = ls_cust-elm003 .
-      ls_cust-elm004 = ls_cust-elm004 .
-      ls_cust-elm005 = ls_cust-elm005 .
-      ls_cust-elm006 = ls_cust-elm006 .
-      ls_cust-elm007 = ls_cust-elm007 .
-      ls_cust-elm008 = ls_cust-elm008 .
-      ls_cust-elm009 = ls_cust-elm009 .
-      ls_cust-elm010 = ls_cust-elm010 .
-      ls_cust-elm011 = ls_cust-elm011 .
-      ls_cust-elm012 = ls_cust-elm012 .
-      ls_cust-elm013 = ls_cust-elm013 .
-      ls_cust-elm014 = ls_cust-elm014 .
-      ls_cust-elm015 = ls_cust-elm015 .
-      ls_cust-elm016 = ls_cust-elm016 .
-      ls_cust-elm017 = ls_cust-elm018 .
-      ls_cust-elm018 = ls_cust-elm018 .
-
-      e_cust = ls_cust.
-    endif.
+      ls_cust-quant = 0.
+      ls_cust-total = 0.
+      ls_cust-stval = 0.
+      ls_cust-prd = 0.
+      ls_cust-kdm = 0.
 
 
-  endmethod.
+    catch cx_sy_itab_line_not_found.
+
+  endtry.
+else.
+
+  ls_cust-total =  ( ls_cust-stval + ls_cust-prd + ls_cust-kdm ) .
+  try .
+      ls_cust-price = ls_cust-total  / ls_cust-quant .
+    catch cx_sy_zerodivide.
+  endtry.
+endif.
+
+
+
+ls_cust-werks = i_werks.
+ls_cust-matnr = i_matnr.
+ls_cust-maktx = me->get_txtmaterial( exporting i_matnr =  i_matnr ).
+ls_cust-poper = i_poper.
+ls_cust-gjhar = i_gjahr.
+
+e_cust = ls_cust.
+
+endmethod.
+
+method get_cost_material_t.
+    data ls_cust type  ty_itab.
+    data lt_cust_detail type table of ty_itab.
+
+    me->get_cost_detail( i_matnr = i_matnr i_werks = i_werks  i_poper =  i_poper i_gjahr = i_gjahr ).
+
+    try.
+      lt_cust_detail = corresponding #( lt_all_sum ).
+      " data(lt_cust_stock_final) = value #( lt_all_sum[ categ = 'EB' ] ).
+      "  ls_cust = corresponding #( lt_cust_stock_final ).
+
+      catch cx_sy_itab_line_not_found.
+
+    endtry.
+
+    "Seleciona descrição das categorias:
+    Select DOMVALUE_L as categ, DDTEXT as categtxt
+      from DD07T
+      into table @data(lt_categ)
+       where DOMNAME = 'CKML_CATEG'
+       and DDLANGUAGE  = @sy-langu.
+
+    loop at lt_cust_detail assigning field-symbol(<fs_cust>).
+        <fs_cust>-matnr = i_matnr.
+        <fs_cust>-maktx = me->get_txtmaterial( exporting i_matnr =  i_matnr ).
+        <fs_cust>-werks = i_werks.
+        <fs_cust>-poper = i_poper.
+        <fs_cust>-gjhar = i_gjahr.
+        <fs_cust>-categtxt = lt_categ[ categ = <fs_cust>-categ ]-categtxt.
+
+        "Sumariza a categoria de consumo
+        collect <fs_cust> into lt_cust.
+    endloop.
+
+    unassign <fs_cust>.
+
+    loop at lt_cust assigning <fs_cust>.
+        <fs_cust>-total =  (  <fs_cust>-stval +  <fs_cust>-prd +  <fs_cust>-kdm ) .
+        try .
+         <fs_cust>-price =  <fs_cust>-total  /  <fs_cust>-quant .
+        catch cx_sy_zerodivide.
+        endtry.
+    endloop.
+
+
+
+
+
+endmethod.
 
 
 * <SIGNATURE>---------------------------------------------------------------------------------------+
@@ -232,4 +390,5 @@ CLASS ZCL_CO_PRODUCT_COST IMPLEMENTATION.
     select single maktx  into re_maktx from makt where matnr = i_matnr and spras = sy-langu.
 
   endmethod.
+
 ENDCLASS.
